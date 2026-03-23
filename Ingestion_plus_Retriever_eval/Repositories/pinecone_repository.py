@@ -7,6 +7,7 @@ from configs.pinecone_config import PineconeConfig
 from Protocols.vector_db_protocol import VectorDBProtocol
 import pandas as pd
 import logging
+from typing import List, Dict
 
 
 class PineconeRepository(VectorDBProtocol):
@@ -112,14 +113,31 @@ class PineconeRepository(VectorDBProtocol):
         final_eval_df = pd.DataFrame(dfs)
         final_eval_df.to_csv("evaluation_dataset.csv", index = False)
         self.logger.info("Evaluation dataset saved to evaluation_dataset.csv")
-    
-    def query_vector_store(self, query : str) -> List[Document]:
+
+    def query_vector_store_for_rankx(self, query: str) -> List[Dict]:
         index = self.client.Index(self.pinecone_config.index_name)
+
+        # Generate embeddings
         query_vector = self.dense_embedding_strategy.embed_query(query)
         sparse_embedding = self.sparse_embedding_strategy.embed_query(query)
-        results = index.query(vector = query_vector, sparse_vector = sparse_embedding, top_k = 10, include_metadata = True)
-        return [Document(page_content = result.metadata["text"], metadata = result.metadata) for result in results.matches]
-            
+
+        # Query Pinecone
+        results = index.query(
+            vector=query_vector,
+            sparse_vector=sparse_embedding,
+            top_k=10,
+            include_metadata=False  # not needed for RankX
+        )
+
+        # Return RankX-compatible format
+        return [
+            {
+                "id": match.id,
+                "score": float(match.score)  # ensure JSON serializable
+            }
+            for match in results.matches
+        ]
+                
             
             
             
