@@ -15,7 +15,7 @@ from rag_pipeline.workflow.database.db_repositories.conversation_repository impo
     ConversationRepository,
 )
 from rag_pipeline.workflow.database.sessions import Database
-from rag_pipeline.workflow.prompts.augment_query_rag import AUGMENT_QUERY_AND_RAG_PROMPT
+from rag_pipeline.workflow.prompts.augment_query_rag import RAG_SYSTEM_PROMPT, RAG_USER_PROMPT
 from rag_pipeline.workflow.prompts.query_rewriter import QUERY_REWRITER_PROMPT
 from rag_pipeline.workflow.prompts.summary_so_far import SUMMARY_SO_FAR
 from rag_pipeline.workflow.protocols.llm_protocol import LLMProtocol
@@ -134,27 +134,51 @@ class RAGService:
         Returns:
             Generated response from LLM.
         """
-        # Format documents into readable text
-        docs_text = (
-            "\n".join(
-                [
-                    f"Document: {doc.page_content}\nMetadata: {doc.metadata}"
-                    for doc in documents
-                ]
+        try:
+            # Format documents into readable text
+            docs_text = (
+                "\n".join(
+                    [
+                        f"Document: {doc.page_content}\nMetadata: {doc.metadata}"
+                        for doc in documents
+                    ]
+                )
+                if documents
+                else "No documents retrieved"
             )
-            if documents
-            else "No documents retrieved"
-        )
 
-        system_message = SystemMessage(content=AUGMENT_QUERY_AND_RAG_PROMPT)
-        query_message = HumanMessage(content=query)
-        context_message = HumanMessage(content=context_summary)
-        docs_message = HumanMessage(content=docs_text)
+            # Format the user prompt with actual values
+            formatted_user_prompt = RAG_USER_PROMPT.format(
+                query=query,
+                summary=context_summary,
+                documents=docs_text
+            )
+            
+            logger.debug(f"Formatted user prompt length: {len(formatted_user_prompt)} characters")
+            logger.debug(f"Formatted user prompt preview: {formatted_user_prompt[:500]}...")
 
-        response = self.llm.invoke(
-            [system_message, query_message, context_message, docs_message]
-        )
-        return response.content
+            # Create system and user messages (pattern matches rewrite_query and generate_context_summary)
+            system_message = SystemMessage(content=RAG_SYSTEM_PROMPT)
+            user_message = HumanMessage(content=formatted_user_prompt)
+            logger.debug("System and user messages created successfully")
+
+            # Invoke LLM with both system and user messages
+            response = self.llm.invoke([system_message, user_message])
+            logger.debug(f"LLM response type: {type(response)}")
+            logger.debug(f"LLM response object: {response}")
+            logger.debug(f"LLM response has content attr: {hasattr(response, 'content')}")
+            
+            if hasattr(response, 'content'):
+                content = response.content
+                logger.info(f"Extracted response content (length: {len(content)}): {content[:200] if content else 'EMPTY'}...")
+                return content
+            else:
+                logger.error(f"Response object does not have 'content' attribute. Response: {response}")
+                return str(response)
+                
+        except Exception as e:
+            logger.error(f"Error in generate_response: {e}", exc_info=True)
+            raise
 
     def save_conversation(
         self, session_id: str, messages: list[BaseMessage], response: str

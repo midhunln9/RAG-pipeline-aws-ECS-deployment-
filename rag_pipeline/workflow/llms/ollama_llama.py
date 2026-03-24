@@ -4,7 +4,7 @@ Ollama LLM implementation.
 Provides integration with Ollama for local LLM inference.
 """
 
-from typing import list
+from typing import List
 
 from langchain_core.messages import BaseMessage
 from langchain_ollama import ChatOllama
