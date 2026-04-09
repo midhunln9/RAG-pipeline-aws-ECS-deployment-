@@ -267,3 +267,19 @@ Detailed documentation is available in the `docs/` directory:
 **Primary LLM**: OpenAI gpt-4o-mini  
 **Vector DB**: Pinecone (AWS us-east-1)  
 **Python**: >= 3.12
+
+---
+
+## Env requirements
+
+- AWS_ACCESS_KEY_ID=access_key
+- AWS_SECRET_ACCESS_KEY=secret_key
+- AWS_REGION=region
+- PINECONE_API_KEY=pinecone_api_key
+- HF_HOME=storage
+- HF_HUB_DISABLE_TELEMETRY=1
+- TRANSFORMERS_OFFLINE=0
+- OPENAI_API_KEY=open_ai_api_key
+- HF_KEY=hf_key
+
+
