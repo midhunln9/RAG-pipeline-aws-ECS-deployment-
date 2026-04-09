@@ -36,3 +36,5 @@ chroma_db/
 
 # Logs
 *.log
+
+sample.db
