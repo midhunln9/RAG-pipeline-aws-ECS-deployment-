@@ -38,3 +38,9 @@ chroma_db/
 *.log
 
 sample.db
+
+/finetuned_model
+sample.db-shm
+sample.db-wal
+.huggingface_cache
+.claude

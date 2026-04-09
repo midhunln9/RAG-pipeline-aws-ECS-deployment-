@@ -30,12 +30,14 @@ from rag_pipeline.workflow.configs.pinecone_config import PineconeConfig
 from rag_pipeline.workflow.configs.llm_config import LLMConfig
 from rag_pipeline.api.routes import ask_endpoint
 from rag_pipeline.workflow.llms.openai import OpenAILLM
+from rag_pipeline.workflow.llms.finetuned_llm import FinetunedLLM
 from rag_pipeline.workflow.embeddings.openai_embedding import OpenAIEmbedding
 from dotenv import load_dotenv, find_dotenv
-"""
+
 load_dotenv("/Users/midhunln/Documents/rag20march_with_eval/Ingestion_plus_Retriever_eval/ingestion.env")
 """
 load_dotenv(find_dotenv())
+"""
 
 # Configure logging
 logging.basicConfig(
@@ -143,6 +145,9 @@ async def lifespan(app: FastAPI):
     llm = OllamaLLM(llm_config)
     """
     llm = OpenAILLM(llm_config)
+    """
+    llm = FinetunedLLM(llm_config)
+    """
     app.state.llm = llm
     logger.info("LLM initialized")
 

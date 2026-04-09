@@ -12,7 +12,7 @@ import requests
 import streamlit as st
 
 # ---------- Configuration ----------
-API_URL = os.getenv("RAG_API_URL", "https://midhunln.online/ask")
+API_URL = os.getenv("RAG_API_URL", "http://127.0.0.1:8000/ask")
 REQUEST_TIMEOUT = 120  # seconds
 
 # ---------- Page Config ----------

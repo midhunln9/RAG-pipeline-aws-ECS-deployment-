@@ -21,7 +21,9 @@ class Settings(BaseSettings):
     
     # LLM Configuration
     llm_model_name: str = "llama3.2"
-    openai_model_name: str = "gpt-4o-mini"
+    openai_model_name_4o_mini: str = "gpt-4o-mini"
+    openai_model_name_5_mini: str = "gpt-5-mini"
+    finetuned_model_path: str = "/Users/midhunln/Documents/rag20march_with_eval/finetuned_model"
     
     # Pinecone Configuration
     pinecone_index_name: str = "final-rag-index-openai-small"
