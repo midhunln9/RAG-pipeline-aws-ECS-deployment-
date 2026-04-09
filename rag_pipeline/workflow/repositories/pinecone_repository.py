@@ -50,28 +50,28 @@ class PineconeRepository(VectorDBProtocol):
         self.dense_embedding_strategy = dense_embedding_strategy
         self.sparse_embedding_strategy = sparse_embedding_strategy
         self.client = Pinecone(api_key=api_key)
+        self.index = self.client.Index(pinecone_config.index_name)
 
     def query(self, query: str, top_k: int = 10) -> list[Document]:
         """
         Query the vector database for documents.
-        
+
         Performs hybrid search using both dense and sparse embeddings.
-        
+
         Args:
             query: Query text.
             top_k: Number of results to retrieve (default: 10).
-            
+
         Returns:
             List of relevant documents.
         """
-        index = self.client.Index(self.pinecone_config.index_name)
 
         # Generate embeddings
         query_vector = self.dense_embedding_strategy.embed_query(query)
         sparse_embedding = self.sparse_embedding_strategy.embed_query(query)
 
         # Query Pinecone with hybrid search
-        results = index.query(
+        results = self.index.query(
             vector=query_vector,
             sparse_vector=sparse_embedding,
             top_k=top_k,

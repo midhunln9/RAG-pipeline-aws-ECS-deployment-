@@ -4,6 +4,7 @@ Ask endpoint for RAG pipeline.
 Provides HTTP interface to query the RAG pipeline and get responses.
 """
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -48,7 +49,7 @@ class AskResponse(BaseModel):
 
 
 @router.post("/ask", response_model=AskResponse)
-def ask(request: Request, ask_request: AskRequest) -> AskResponse:
+async def ask(request: Request, ask_request: AskRequest) -> AskResponse:
     """
     Query the RAG pipeline and get a response.
     
@@ -71,10 +72,11 @@ def ask(request: Request, ask_request: AskRequest) -> AskResponse:
             f"Processing query for session {ask_request.session_id}: {ask_request.query[:50]}..."
         )
         
-        # Execute the workflow
-        result = request.app.state.workflow.execute(
+        # Execute the workflow in a thread pool to avoid blocking the event loop
+        result = await asyncio.to_thread(
+            request.app.state.workflow.execute,
             query=ask_request.query,
-            session_id=ask_request.session_id
+            session_id=ask_request.session_id,
         )
         
         logger.debug(f"Workflow execution result keys: {result.keys()}")

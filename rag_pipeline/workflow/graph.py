@@ -46,10 +46,14 @@ class RAGWorkflow:
         graph.add_node("llm_call", self.nodes.llm_call)
         graph.add_node("add_conversation", self.nodes.add_conversation_to_db)
 
-        # Define edges (workflow sequence)
+        # Define edges - parallelize independent nodes
+        # query_rewriter and generate_summary run in parallel from START
+        # fetch_documents depends on query_rewriter (needs rewritten_query)
+        # llm_call waits for both fetch_documents and generate_summary (fan-in)
         graph.add_edge(START, "query_rewriter")
+        graph.add_edge(START, "generate_summary_last_5_messages")
         graph.add_edge("query_rewriter", "fetch_documents")
-        graph.add_edge("fetch_documents", "generate_summary_last_5_messages")
+        graph.add_edge("fetch_documents", "llm_call")
         graph.add_edge("generate_summary_last_5_messages", "llm_call")
         graph.add_edge("llm_call", "add_conversation")
         graph.add_edge("add_conversation", END)

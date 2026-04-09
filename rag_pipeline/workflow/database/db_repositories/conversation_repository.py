@@ -31,17 +31,18 @@ class ConversationRepository:
         session.add(conversation)
 
     def get_conversations_by_session_id(
-        self, session: Session, session_id: str
+        self, session: Session, session_id: str, limit: int = 10
     ) -> list[Conversation]:
         """
-        Retrieve all conversations for a given session ID.
-        
-        Results are ordered by most recent first.
-        
+        Retrieve recent conversations for a given session ID.
+
+        Results are ordered by most recent first, limited to avoid unbounded queries.
+
         Args:
             session: SQLAlchemy session for the transaction.
             session_id: Unique identifier for the user session.
-            
+            limit: Maximum number of conversations to retrieve.
+
         Returns:
             List of Conversation objects for the session, ordered by recency.
         """
@@ -49,5 +50,6 @@ class ConversationRepository:
             session.query(Conversation)
             .filter(Conversation.session_id == session_id)
             .order_by(Conversation.created_at.desc())
+            .limit(limit)
             .all()
         )
