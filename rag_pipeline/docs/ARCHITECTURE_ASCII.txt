@@ -1,0 +1,285 @@
+═══════════════════════════════════════════════════════════════════════════════
+                     RAG PIPELINE SYSTEM ARCHITECTURE
+                            ASCII Diagram
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                        PRESENTATION LAYER                                    │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│                      ┌──────────────────────┐                               │
+│                      │   User / Client      │                               │
+│                      │   Applications       │                               │
+│                      └──────────┬───────────┘                               │
+│                                 │                                            │
+└─────────────────────────────────┼────────────────────────────────────────────┘
+                                  │
+                                  │ HTTP POST /ask
+                                  │
+┌─────────────────────────────────▼────────────────────────────────────────────┐
+│                          API LAYER                                            │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                              │
+│   ┌────────────────────────────────────────────────────────────────┐        │
+│   │              FastAPI Server (Port 8000)                         │        │
+│   │  ┌──────────────────────────────────────────────────────────┐  │        │
+│   │  │  POST /ask                                               │  │        │
+│   │  │  - Accepts: AskRequest(query, session_id)               │  │        │
+│   │  │  - Returns: AskResponse(response, source_documents)     │  │        │
+│   │  │  - Validates dependencies on startup                    │  │        │
+│   │  └──────────────────────────────────────────────────────────┘  │        │
+│   └────────────────────────────┬─────────────────────────────────────┘        │
+│                                │                                            │
+└────────────────────────────────┼────────────────────────────────────────────┘
+                                 │
+                                 │ Invoke Workflow
+                                 │
+┌────────────────────────────────▼────────────────────────────────────────────┐
+│                    ORCHESTRATION LAYER                                        │
+├────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │          LangGraph Workflow State Machine                            │  │
+│  │                                                                      │  │
+│  │  ┌─────────┐     ┌──────────────┐      ┌──────────────────┐        │  │
+│  │  │  START  │────▶│ Query        │─────▶│   PARALLEL       │        │  │
+│  │  └─────────┘     │ Rewriter     │      │   EXECUTION      │        │  │
+│  │                  └──────────────┘      └────┬────────┬────┘        │  │
+│  │                                             │        │             │  │
+│  │                                ┌────────────▼┐    ┌──▼──────────┐ │  │
+│  │                                │ Fetch       │    │ Context      │ │  │
+│  │                                │ Documents   │    │ Summarizer   │ │  │
+│  │                                └────────────┬┘    └──┬──────────┘ │  │
+│  │                                             │        │             │  │
+│  │                                             └────┬───┘             │  │
+│  │                                                  │                 │  │
+│  │                                        ┌─────────▼────────┐       │  │
+│  │                                        │  LLM Call        │       │  │
+│  │                                        │  Generate        │       │  │
+│  │                                        │  Response        │       │  │
+│  │                                        └─────────┬────────┘       │  │
+│  │                                                  │                 │  │
+│  │                                        ┌─────────▼────────┐       │  │
+│  │                                        │ Add to Database  │       │  │
+│  │                                        │ Persist Conv.    │       │  │
+│  │                                        └─────────┬────────┘       │  │
+│  │                                                  │                 │  │
+│  │                                        ┌─────────▼────────┐       │  │
+│  │                                        │      END         │       │  │
+│  │                                        └──────────────────┘       │  │
+│  │                                                                      │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │          RAGService Orchestrator                                     │  │
+│  │  - Coordinates between nodes                                         │  │
+│  │  - Manages state transitions                                         │  │
+│  │  - Handles service dependencies                                      │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                             │
+└─────────────────────────────────┬────────────────────────────────────────────┘
+                                  │
+                    ┌─────────────┬────────────┬─────────────┬──────────┐
+                    │             │            │             │          │
+┌───────────────────▼────┐   ┌────▼──────┐  ┌─▼─────────┐ ┌─▼──────┐ ┌▼──┐
+│ Query Rewriter Service │   │ Document  │  │ Context   │ │ LLM    │ │DB │
+│ - LLM Rewriting        │   │ Retriever │  │ Summary   │ │Generator│ │WR │
+│ - Prompt Templates     │   │ - Hybrid  │  │ - History │ │- Prompt │ │RI │
+└────────┬───────────────┘   │   Search  │  │ - LLM     │ │ Temp.  │ │TE │
+         │                    │ - Ranking │  │ Summ.     │ │Response│ │R  │
+         │                    └────┬──────┘  └─┬────────┘ └─┬─────┘ └┬──┘
+         │                         │          │          │
+┌────────▼────────────────────────┼──────────┼──────────┼──────────────────┐
+│                  SERVICE LAYER & DATA ACCESS                             │
+├────────────────────────────────────────────────────────────────────────┤
+│                                                                        │
+│  LLM Abstraction Layer           Vector DB Layer    Database Layer    │
+│  ┌─────────────────────────┐  ┌──────────────────┐ ┌───────────────┐  │
+│  │ LLM Protocol/Interface  │  │ PineconeRepository│ │ Conversation  │  │
+│  ├─────────────────────────┤  │ - Hybrid Search  │ │ Repository    │  │
+│  │ ├─ OpenAI gpt-4o-mini  │  │ - Dense Embed    │ │ - Add Conv.   │  │
+│  │ ├─ Ollama llama3.2      │  │ - Sparse Embed   │ │ - Get Conv.   │  │
+│  │ └─ Finetuned Model      │  │ - Top-K Return   │ │ - Session ID  │  │
+│  │                         │  │                  │ │   Lookup      │  │
+│  │ Concurrency Control:    │  └────┬─────────────┘ └───────┬────────┘  │
+│  │ - Semaphore (max 10)    │       │                       │           │
+│  │ - Rate Limiting         │       │                       │           │
+│  └─────────┬───────────────┘       │                       │           │
+│            │                       │                       │           │
+└────────────┼───────────────────────┼───────────────────────┼───────────┘
+             │                       │                       │
+┌────────────▼─────┬─────────────────▼─────┬─────────────────▼─────────────┐
+│ EXTERNAL SERVICES & INFRASTRUCTURE                                       │
+├──────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  LLM Providers              Embeddings                 Vector Database  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────┐ │
+│  │  OpenAI API      │  │ Dense Embeddings │  │  Pinecone            │ │
+│  │  gpt-4o-mini     │  │ OpenAI           │  │  Cloud VectorDB      │ │
+│  │  (Active)        │  │ text-embedding   │  │  Index: final-rag    │ │
+│  │                  │  │ -3-small         │  │  Metric: dotproduct  │ │
+│  │                  │  │                  │  │  Region: AWS us-east │ │
+│  └────────┬─────────┘  └────────┬─────────┘  └──────────┬────────────┘ │
+│           │                     │                       │              │
+│  ┌────────▼─────────────┐  ┌────▼──────────────┐                       │
+│  │ Ollama (Alternative) │  │ Sparse Embeddings│  Database              │
+│  │ llama3.2             │  │ SPLADE Model     │  ┌─────────────────┐  │
+│  │ Local Server         │  │ naver/splade-... │  │  SQLite         │  │
+│  │ (Fallback)           │  └──────────────────┘  │  sample.db      │  │
+│  └──────────────────────┘                        │  WAL Mode       │  │
+│                                                  │  Session Index  │  │
+│  ┌──────────────────┐                           └─────────────────┘  │
+│  │ Finetuned Model  │                                                │
+│  │ Local Alternative│                                                │
+│  └──────────────────┘                                                │
+│                                                                          │
+└──────────────────────────────────────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+                          DATA FLOW SEQUENCE
+═══════════════════════════════════════════════════════════════════════════════
+
+1. CLIENT REQUEST
+   ┌─────────────────────────────────────────────┐
+   │ POST /ask                                    │
+   │ {                                            │
+   │   "query": "What is financial compliance?", │
+   │   "session_id": "user-123"                   │
+   │ }                                            │
+   └────────┬────────────────────────────────────┘
+            │
+            ▼
+2. WORKFLOW INITIALIZATION
+   ┌──────────────────────────────────────────────┐
+   │ Create AgentState with:                      │
+   │ - query (original)                           │
+   │ - session_id                                 │
+   │ - empty lists for documents, response, etc. │
+   └────────┬─────────────────────────────────────┘
+            │
+            ▼
+3. QUERY REWRITING (Node 1)
+   ┌──────────────────────────────────────────────┐
+   │ LLM rewrites query for better retrieval:     │
+   │ Input: "What is financial compliance?"       │
+   │ Output: "Definition of financial compliance  │
+   │          regulations and requirements"       │
+   │ Sets: state.rewritten_query                  │
+   └────────┬─────────────────────────────────────┘
+            │
+            └────────────────┬────────────────┐
+                             │                │
+            ▼                                  ▼
+4a. DOCUMENT RETRIEVAL      4b. CONTEXT SUMMARIZATION
+    (Node 2 - Parallel)        (Node 3 - Parallel)
+    ┌─────────────────────┐    ┌─────────────────────┐
+    │ Query Pinecone with │    │ Fetch conversation  │
+    │ rewritten query     │    │ history (last 10)   │
+    │                     │    │                     │
+    │ Hybrid Search:      │    │ Summarize using LLM:│
+    │ - Dense embedding   │    │ Condense 10 turns   │
+    │   (OpenAI)          │    │ into context summary│
+    │ - Sparse embedding  │    │                     │
+    │   (SPLADE)          │    │ Sets:               │
+    │ - Rank & filter     │    │ state.summary...    │
+    │ - Return top 10 docs│    │                     │
+    │                     │    │                     │
+    │ Sets:               │    └────────┬────────────┘
+    │ state.retrieved_... │             │
+    └──────────┬──────────┘             │
+               │                        │
+               └────────────┬───────────┘
+                            │
+                            ▼
+5. LLM RESPONSE GENERATION (Node 4)
+   ┌────────────────────────────────────────────────────┐
+   │ LLM synthesizes response from:                      │
+   │ - Rewritten query                                  │
+   │ - Retrieved documents (with sources)               │
+   │ - Conversation context summary                     │
+   │ - System prompt (Financial Compliance domain)      │
+   │                                                    │
+   │ Input to LLM:                                      │
+   │ System: "You are a financial compliance expert..." │
+   │ User: "Query: {query}"                             │
+   │       "Context: {summary}"                         │
+   │       "Documents: {docs}"                          │
+   │                                                    │
+   │ Sets: state.response                               │
+   └────────┬───────────────────────────────────────────┘
+            │
+            ▼
+6. DATABASE PERSISTENCE (Node 5)
+   ┌──────────────────────────────────────────┐
+   │ Save to SQLite:                           │
+   │ - session_id                              │
+   │ - query (original + rewritten)            │
+   │ - response                                │
+   │ - messages (conversation thread)          │
+   │ - timestamp                               │
+   └────────┬─────────────────────────────────┘
+            │
+            ▼
+7. CLIENT RESPONSE
+   ┌────────────────────────────────────────┐
+   │ HTTP 200 OK                             │
+   │ {                                       │
+   │   "response": "Financial compliance...", │
+   │   "session_id": "user-123",              │
+   │   "source_documents": [                  │
+   │     {                                    │
+   │       "content": "...",                  │
+   │       "metadata": {...}                  │
+   │     }                                    │
+   │   ]                                      │
+   │ }                                        │
+   └────────────────────────────────────────┘
+
+═══════════════════════════════════════════════════════════════════════════════
+                       CONFIGURATION & ENVIRONMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+Required Environment Variables:
+├── OPENAI_API_KEY           → OpenAI API authentication
+├── PINECONE_API_KEY         → Pinecone vector DB authentication
+├── DATABASE_URL             → SQLite path (default: sqlite:///sample.db)
+├── OPENAI_MODEL             → Model to use (default: gpt-4o-mini)
+├── PINECONE_INDEX           → Index name (default: final-rag-index-openai-small)
+└── PINECONE_METRIC          → Metric type (default: dotproduct)
+
+Configuration Sources (Priority Order):
+1. Environment Variables (Highest Priority)
+2. .env file (if project uses python-dotenv)
+3. Settings class defaults (Lowest Priority)
+
+═══════════════════════════════════════════════════════════════════════════════
+                         SYSTEM CHARACTERISTICS
+═══════════════════════════════════════════════════════════════════════════════
+
+Parallelization:
+  ✓ Document retrieval and context summarization run in parallel
+  ✓ API requests handled asynchronously via FastAPI
+  ✓ Non-blocking workflow execution using asyncio.to_thread()
+
+Scalability Features:
+  ✓ LLM request concurrency control (Semaphore, max 10 concurrent)
+  ✓ Vector DB batch operations (batch size: 200)
+  ✓ SQLite WAL mode for concurrent reads
+  ✓ Connection pooling for database
+
+Fault Tolerance:
+  ✓ Validation of all dependencies at API startup
+  ✓ Error handling in node execution
+  ✓ Database transaction management (commit/rollback)
+
+Domain Specialization:
+  ✓ Financial Compliance focused prompts and system instructions
+  ✓ Context-aware responses using conversation history
+  ✓ Hybrid search combining dense and sparse embeddings
+
+Extensibility:
+  ✓ Pluggable LLM implementations (Protocol-based abstraction)
+  ✓ Swappable embedding strategies
+  ✓ Modular node design in LangGraph
+
+═══════════════════════════════════════════════════════════════════════════════
